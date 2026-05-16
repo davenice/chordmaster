@@ -1,0 +1,289 @@
+/* ── Custom properties ──────────────────────────────────────────────────────── */
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --surface-raised: #0f3460;
+  --accent: #e94560;
+  --accent-dim: #b03348;
+  --text: #eaeaea;
+  --text-muted: #9a9ab0;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --gap: 12px;
+  --font: 'Inter', system-ui, sans-serif;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 24px 16px 48px;
+}
+
+#app {
+  width: 100%;
+  max-width: 600px;
+}
+
+/* ── Layout wrapper ─────────────────────────────────────────────────────────── */
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+.app-header {
+  text-align: center;
+}
+
+.app-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+/* ── Key selector ───────────────────────────────────────────────────────────── */
+.key-selector {
+  display: flex;
+  gap: var(--gap);
+  justify-content: center;
+}
+
+.selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.selector-group label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper::after {
+  content: '▾';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+select {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--surface-raised);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: var(--font);
+  padding: 10px 36px 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+select:focus {
+  border-color: var(--accent);
+}
+
+/* ── Chord grid ─────────────────────────────────────────────────────────────── */
+.chord-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--gap);
+}
+
+@media (max-width: 480px) {
+  .chord-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ── Chord button ───────────────────────────────────────────────────────────── */
+.chord-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  padding: 16px 6px;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chord-btn:hover {
+  background: var(--surface-raised);
+  border-color: var(--accent-dim);
+}
+
+.chord-btn:active {
+  transform: scale(0.96);
+}
+
+.chord-btn--active {
+  background: var(--surface-raised);
+  border-color: var(--accent);
+}
+
+.chord-roman {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.chord-btn--active .chord-roman {
+  color: var(--accent);
+}
+
+.chord-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.chord-quality {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Voicing display ────────────────────────────────────────────────────────── */
+.voicing-display {
+  text-align: center;
+  min-height: 2rem;
+  font-size: 0.95rem;
+}
+
+.voicing-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.voicing-info {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.voicing-info em {
+  color: var(--text-muted);
+  font-style: normal;
+  font-size: 0.85rem;
+}
+
+/* ── Control panel ──────────────────────────────────────────────────────────── */
+.control-panel {
+  border-top: 1px solid var(--surface-raised);
+  padding-top: 8px;
+}
+
+.control-panel__handle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 4px 0;
+  width: 100%;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.control-panel__handle:hover {
+  color: var(--text);
+}
+
+.control-panel__chevron {
+  font-size: 0.65rem;
+}
+
+.control-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0 4px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.control-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Segment toggle ─────────────────────────────────────────────────────────── */
+.segment-toggle {
+  display: flex;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 2px;
+}
+
+.segment-btn {
+  background: none;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 6px 16px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segment-btn:hover {
+  color: var(--text);
+}
+
+.segment-btn--active {
+  background: var(--surface-raised);
+  color: var(--text);
+}
