@@ -19,6 +19,7 @@ let state = {
   prevNotes: null,
   activeIndex: null,
   lastVoicing: null,
+  shiftHeld: false,
 
   // detect mode
   detectedChord: null,
@@ -138,17 +139,20 @@ function renderPlayView() {
     ${renderKeySelector()}
 
     <section class="chord-grid" aria-label="Chord buttons">
-      ${state.chords.map((chord, i) => `
+      ${state.chords.map((chord, i) => {
+        const display   = state.shiftHeld ? invertedChord(chord) : chord;
+        const isShifted = display !== chord;
+        return `
         <button
-          class="chord-btn${i === state.activeIndex ? ' chord-btn--active' : ''}"
+          class="chord-btn${i === state.activeIndex ? ' chord-btn--active' : ''}${isShifted ? ' chord-btn--shifted' : ''}"
           data-index="${i}"
           aria-pressed="${i === state.activeIndex}"
         >
-          <span class="chord-roman">${chord.roman}</span>
-          <span class="chord-name">${chord.name}</span>
-          <span class="chord-quality">${chord.quality}</span>
-        </button>
-      `).join('')}
+          <span class="chord-roman">${display.roman}</span>
+          <span class="chord-name">${display.name}</span>
+          <span class="chord-quality">${display.quality}</span>
+        </button>`;
+      }).join('')}
     </section>
 
     <div class="voicing-display" aria-live="polite">
@@ -311,7 +315,8 @@ function invertedChord(chord) {
   const flipped = chord.quality === 'maj' ? 'min' : chord.quality === 'min' ? 'maj' : chord.quality;
   if (flipped === chord.quality) return chord;
   const suffix = flipped === 'maj' ? '' : 'm';
-  return { ...chord, quality: flipped, name: chord.name.replace(/m?$/, suffix) };
+  const roman  = flipped === 'maj' ? chord.roman.toUpperCase() : chord.roman.toLowerCase();
+  return { ...chord, quality: flipped, name: chord.name.replace(/m?$/, suffix), roman };
 }
 
 async function handleKeyDown(e) {
@@ -362,8 +367,23 @@ async function handleChordTap(index) {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
+function handleShiftDown(e) {
+  if (e.key !== 'Shift' || e.repeat || state.shiftHeld) return;
+  if (state.appMode !== 'play') return;
+  state.shiftHeld = true;
+  render();
+}
+
+function handleShiftUp(e) {
+  if (e.key !== 'Shift' || !state.shiftHeld) return;
+  state.shiftHeld = false;
+  render();
+}
+
 export function init() {
   state.chords = buildDiatonicChords(state.root, state.mode);
   render();
   document.addEventListener('keydown', handleKeyDown);
+  document.addEventListener('keydown', handleShiftDown);
+  document.addEventListener('keyup', handleShiftUp);
 }

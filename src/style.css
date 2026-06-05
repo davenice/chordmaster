@@ -5,6 +5,8 @@
   --surface-raised: #0f3460;
   --accent: #e94560;
   --accent-dim: #b03348;
+  --shift-accent: #4ecdc4;
+  --shift-accent-dim: #2e9e98;
   --text: #eaeaea;
   --text-muted: #9a9ab0;
   --radius: 12px;
@@ -157,6 +159,19 @@ select:focus {
 .chord-btn--active {
   background: var(--surface-raised);
   border-color: var(--accent);
+}
+
+.chord-btn--shifted {
+  border-color: var(--shift-accent-dim);
+}
+
+.chord-btn--shifted .chord-roman,
+.chord-btn--shifted .chord-quality {
+  color: var(--shift-accent);
+}
+
+.chord-btn--shifted .chord-name {
+  color: var(--shift-accent);
 }
 
 .chord-roman {
