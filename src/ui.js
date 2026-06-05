@@ -203,9 +203,7 @@ function renderDetectView() {
         <div class="detect-status">${statusText}</div>
       </div>
 
-      ${state.midiInitialized && getMIDIInputCount() === 0 ? `
       <div id="detect-keyboard-container" class="detect-keyboard-wrap"></div>
-      ` : ''}
     </section>`;
 }
 
@@ -235,10 +233,8 @@ function render() {
 
 function afterRender() {
   if (state.appMode === 'detect') {
-    if (state.midiInitialized && getMIDIInputCount() === 0) {
       const kbContainer = document.getElementById('detect-keyboard-container');
       if (kbContainer) initKeyboard(kbContainer, handleNotesChange);
-    }
     updateDetectDisplay();
   }
 }
