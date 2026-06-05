@@ -365,6 +365,25 @@ select:focus {
 .detect-keyboard-wrap {
   width: 100%;
   overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.piano-clear-btn {
+  align-self: flex-end;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border, #555);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted, #aaa);
+  cursor: pointer;
+}
+
+.piano-clear-btn:hover {
+  background: var(--surface-raised, #2a2a2a);
+  color: var(--text);
 }
 
 .piano-keyboard {

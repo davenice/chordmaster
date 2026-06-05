@@ -1,6 +1,6 @@
 import { ROOT_NOTES, buildDiatonicChords, chooseBestVoicing, chooseForcedInversion, inversionLabel, midiToName, keyUsesSharps } from './theory.js';
 import { playChord, setSoundMode, echoNoteOn, echoNoteOff, releaseAllNotes } from './synth.js';
-import { initMIDI, onNotesChange, getMIDIInputCount } from './midi.js';
+import { initMIDI, onNotesChange, onDeviceChange, getMIDIInputCount } from './midi.js';
 import { detectChord } from './chords.js';
 import { initKeyboard } from './keyboard.js';
 
@@ -65,6 +65,7 @@ async function ensureMIDI() {
   if (state.midiInitialized) return;
   state.midiInitialized = true;
   onNotesChange(handleNotesChange);
+  onDeviceChange(render);
   const result = await initMIDI();
   state.midiSupported = result.supported;
   state.midiError     = result.error ?? null;
@@ -202,7 +203,7 @@ function renderDetectView() {
         <div class="detect-status">${statusText}</div>
       </div>
 
-      ${!state.midiSupported && state.midiInitialized ? `
+      ${state.midiInitialized && getMIDIInputCount() === 0 ? `
       <div id="detect-keyboard-container" class="detect-keyboard-wrap"></div>
       ` : ''}
     </section>`;
@@ -234,7 +235,7 @@ function render() {
 
 function afterRender() {
   if (state.appMode === 'detect') {
-    if (!state.midiSupported && state.midiInitialized) {
+    if (state.midiInitialized && getMIDIInputCount() === 0) {
       const kbContainer = document.getElementById('detect-keyboard-container');
       if (kbContainer) initKeyboard(kbContainer, handleNotesChange);
     }

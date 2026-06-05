@@ -3,8 +3,6 @@ const WHITE_PCS   = [0, 2, 4, 5, 7, 9, 11];
 const TOTAL_WHITE = 14;
 const START_MIDI  = 48; // C3
 
-// Left edge of each black key as a multiple of white-key-width from octave start
-// Black key width = 0.6 white keys; center is between adjacent white keys
 const BLACK_DEFS = [
   { pc: 1,  left: 0.7  },  // C#
   { pc: 3,  left: 1.7  },  // D#
@@ -14,11 +12,12 @@ const BLACK_DEFS = [
 ];
 const BLACK_WIDTH = 0.6; // in white-key units
 
-/**
- * Render a 2-octave piano keyboard into `container`.
- * Calls onNotesChange([...midiNumbers]) whenever held notes change.
- */
+let escapeController = null;
+
 export function initKeyboard(container, onNotesChange) {
+  escapeController?.abort();
+  escapeController = new AbortController();
+
   container.innerHTML = '';
 
   const held = new Set();
@@ -27,19 +26,26 @@ export function initKeyboard(container, onNotesChange) {
     onNotesChange([...held]);
   }
 
-  function press(midi) {
-    if (held.has(midi)) return;
-    held.add(midi);
-    highlight(midi, true);
+  function toggle(midi) {
+    if (held.has(midi)) {
+      held.delete(midi);
+      highlight(midi, false);
+    } else {
+      held.add(midi);
+      highlight(midi, true);
+    }
     fire();
   }
 
-  function release(midi) {
-    if (!held.has(midi)) return;
-    held.delete(midi);
-    highlight(midi, false);
+  function clearAll() {
+    held.forEach(midi => highlight(midi, false));
+    held.clear();
     fire();
   }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && container.isConnected) clearAll();
+  }, { signal: escapeController.signal });
 
   function highlight(midi, on) {
     const el = container.querySelector(`[data-midi="${midi}"]`);
@@ -49,12 +55,8 @@ export function initKeyboard(container, onNotesChange) {
   function attachPointer(el, midi) {
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      press(midi);
+      toggle(midi);
     });
-    el.addEventListener('pointerup',     () => release(midi));
-    el.addEventListener('pointercancel', () => release(midi));
-    el.addEventListener('pointerleave',  () => release(midi));
   }
 
   const keyboard = document.createElement('div');
@@ -62,7 +64,6 @@ export function initKeyboard(container, onNotesChange) {
   keyboard.style.touchAction = 'none';
 
   for (let oct = 0; oct < 2; oct++) {
-    // White keys
     WHITE_PCS.forEach((pc, idx) => {
       const midi = START_MIDI + oct * 12 + pc;
       const key  = document.createElement('div');
@@ -74,7 +75,6 @@ export function initKeyboard(container, onNotesChange) {
       keyboard.appendChild(key);
     });
 
-    // Black keys (absolutely positioned over white keys)
     BLACK_DEFS.forEach(({ pc, left }) => {
       const midi = START_MIDI + oct * 12 + pc;
       const key  = document.createElement('div');
@@ -87,5 +87,11 @@ export function initKeyboard(container, onNotesChange) {
     });
   }
 
+  const clearBtn = document.createElement('button');
+  clearBtn.className   = 'piano-clear-btn';
+  clearBtn.textContent = 'Clear';
+  clearBtn.addEventListener('click', clearAll);
+
   container.appendChild(keyboard);
+  container.appendChild(clearBtn);
 }

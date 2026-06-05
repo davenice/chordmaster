@@ -1,9 +1,14 @@
 let heldNotes = new Set();
 let notesChangeCb = null;
+let deviceChangeCb = null;
 let midiAccess = null;
 
 export function onNotesChange(cb) {
   notesChangeCb = cb;
+}
+
+export function onDeviceChange(cb) {
+  deviceChangeCb = cb;
 }
 
 export function getMIDIInputCount() {
@@ -44,6 +49,7 @@ export async function initMIDI() {
           fire();
         }
         wireInputs();
+        deviceChangeCb?.();
       }
     };
     wireInputs();
