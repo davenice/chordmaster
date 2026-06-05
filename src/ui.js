@@ -1,90 +1,207 @@
-import { ROOT_NOTES, buildDiatonicChords, chooseBestVoicing, chooseForcedInversion, inversionLabel, midiToName } from './theory.js';
-import { playChord, setSoundMode } from './synth.js';
+import { ROOT_NOTES, buildDiatonicChords, chooseBestVoicing, chooseForcedInversion, inversionLabel, midiToName, keyUsesSharps } from './theory.js';
+import { playChord, setSoundMode, echoNoteOn, echoNoteOff, releaseAllNotes } from './synth.js';
+import { initMIDI, onNotesChange, getMIDIInputCount } from './midi.js';
+import { detectChord } from './chords.js';
+import { initKeyboard } from './keyboard.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let state = {
+  // shared
+  appMode: 'play',       // 'play' | 'detect'
   root: 'C',
   mode: 'major',
   soundMode: 'long',
   controlsOpen: false,
+
+  // play mode
   chords: [],
   prevNotes: null,
   activeIndex: null,
+  lastVoicing: null,
+
+  // detect mode
+  detectedChord: null,
+  echoEnabled: false,
+  midiInitialized: false,
+  midiSupported: false,
+  midiError: null,
 };
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// C major / A minor have no accidentals; flats read more naturally for borrowed chords
+function chordNamingUseSharps() {
+  if (state.root === 'C') return false;
+  return keyUsesSharps(state.root, state.mode);
+}
+
+// ── MIDI / notes callback ─────────────────────────────────────────────────────
+
+let echoHeld = new Set(); // tracks which notes the synth is currently sounding
+
+function handleNotesChange(midiNotes) {
+  state.detectedChord = midiNotes.length >= 2 ? detectChord(midiNotes, chordNamingUseSharps()) : null;
+
+  if (state.echoEnabled) {
+    const next = new Set(midiNotes);
+    // Release notes no longer held
+    for (const n of echoHeld) {
+      if (!next.has(n)) echoNoteOff(n);
+    }
+    // Attack newly pressed notes only
+    for (const n of next) {
+      if (!echoHeld.has(n)) echoNoteOn(n);
+    }
+    echoHeld = next;
+  }
+
+  // Partial DOM update — avoids full re-render on every MIDI event
+  updateDetectDisplay();
+}
+
+async function ensureMIDI() {
+  if (state.midiInitialized) return;
+  state.midiInitialized = true;
+  onNotesChange(handleNotesChange);
+  const result = await initMIDI();
+  state.midiSupported = result.supported;
+  state.midiError     = result.error ?? null;
+  render(); // re-render once to show MIDI status + optional keyboard
+}
+
+// ── Detect mode display (partial update) ─────────────────────────────────────
+
+function getDiatonicLabel(root) {
+  const diatonic = buildDiatonicChords(state.root, state.mode);
+  const match    = diatonic.find(c => c.rootMidi === root);
+  return match ? `${match.roman} in ${state.root} ${state.mode}` : null;
+}
+
+function updateDetectDisplay() {
+  const nameEl     = document.getElementById('detect-chord-name');
+  const notesEl    = document.getElementById('detect-chord-notes');
+  const diatonicEl = document.getElementById('detect-diatonic');
+  if (!nameEl) return;
+
+  if (!state.detectedChord) {
+    nameEl.textContent     = '—';
+    notesEl.textContent    = '';
+    diatonicEl.textContent = '';
+    return;
+  }
+
+  nameEl.textContent = state.detectedChord.name;
+  notesEl.innerHTML  = state.detectedChord.notes
+    .map(n => `<span class="${n.matched ? '' : 'detect-note--extra'}">${n.name}</span>`)
+    .join('  ');
+
+  const label = getDiatonicLabel(state.detectedChord.root);
+  diatonicEl.textContent = label ?? '';
+}
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-function render() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <div class="app-wrapper">
-      <header class="app-header">
-        <h1 class="app-title">ChordMaster</h1>
-      </header>
+function renderModeTabs() {
+  return `
+    <div class="mode-tabs" role="tablist">
+      <button class="mode-tab${state.appMode === 'play'   ? ' mode-tab--active' : ''}" data-mode="play"   role="tab" aria-selected="${state.appMode === 'play'}">Play</button>
+      <button class="mode-tab${state.appMode === 'detect' ? ' mode-tab--active' : ''}" data-mode="detect" role="tab" aria-selected="${state.appMode === 'detect'}">Detect</button>
+    </div>`;
+}
 
-      <section class="key-selector" aria-label="Key and mode selector">
-        <div class="selector-group">
-          <label for="root-select">Root</label>
-          <div class="select-wrapper">
-            <select id="root-select">
-              ${ROOT_NOTES.map((n) => `<option value="${n}"${n === state.root ? ' selected' : ''}>${n}</option>`).join('')}
-            </select>
-          </div>
+function renderKeySelector() {
+  return `
+    <section class="key-selector" aria-label="Key and mode selector">
+      <div class="selector-group">
+        <label for="root-select">Root</label>
+        <div class="select-wrapper">
+          <select id="root-select">
+            ${ROOT_NOTES.map(n => `<option value="${n}"${n === state.root ? ' selected' : ''}>${n}</option>`).join('')}
+          </select>
         </div>
-        <div class="selector-group">
-          <label for="mode-select">Mode</label>
-          <div class="select-wrapper">
-            <select id="mode-select">
-              <option value="major"${state.mode === 'major' ? ' selected' : ''}>Major</option>
-              <option value="minor"${state.mode === 'minor' ? ' selected' : ''}>Minor</option>
-            </select>
-          </div>
-        </div>
-      </section>
-
-      <section class="chord-grid" aria-label="Chord buttons">
-        ${state.chords
-          .map(
-            (chord, i) => `
-          <button
-            class="chord-btn${i === state.activeIndex ? ' chord-btn--active' : ''}"
-            data-index="${i}"
-            aria-pressed="${i === state.activeIndex}"
-          >
-            <span class="chord-roman">${chord.roman}</span>
-            <span class="chord-name">${chord.name}</span>
-            <span class="chord-quality">${chord.quality}</span>
-          </button>
-        `
-          )
-          .join('')}
-      </section>
-
-      <div class="voicing-display" aria-live="polite">
-        ${renderVoicingLabel()}
       </div>
+      <div class="selector-group">
+        <label for="mode-select">Mode</label>
+        <div class="select-wrapper">
+          <select id="mode-select">
+            <option value="major"${state.mode === 'major' ? ' selected' : ''}>Major</option>
+            <option value="minor"${state.mode === 'minor' ? ' selected' : ''}>Minor</option>
+          </select>
+        </div>
+      </div>
+    </section>`;
+}
 
-      <div class="control-panel">
-        <button class="control-panel__handle" id="controls-toggle" aria-expanded="${state.controlsOpen}">
-          Settings <span class="control-panel__chevron">${state.controlsOpen ? '▴' : '▾'}</span>
+function renderPlayView() {
+  return `
+    ${renderKeySelector()}
+
+    <section class="chord-grid" aria-label="Chord buttons">
+      ${state.chords.map((chord, i) => `
+        <button
+          class="chord-btn${i === state.activeIndex ? ' chord-btn--active' : ''}"
+          data-index="${i}"
+          aria-pressed="${i === state.activeIndex}"
+        >
+          <span class="chord-roman">${chord.roman}</span>
+          <span class="chord-name">${chord.name}</span>
+          <span class="chord-quality">${chord.quality}</span>
         </button>
-        ${state.controlsOpen ? `
-        <div class="control-panel__body">
-          <div class="control-row">
-            <span class="control-label">Sound</span>
-            <div class="segment-toggle" role="group" aria-label="Sound duration">
-              <button class="segment-btn${state.soundMode === 'short' ? ' segment-btn--active' : ''}" data-sound-mode="short">Short</button>
-              <button class="segment-btn${state.soundMode === 'long' ? ' segment-btn--active' : ''}" data-sound-mode="long">Long</button>
-            </div>
+      `).join('')}
+    </section>
+
+    <div class="voicing-display" aria-live="polite">
+      ${renderVoicingLabel()}
+    </div>
+
+    <div class="control-panel">
+      <button class="control-panel__handle" id="controls-toggle" aria-expanded="${state.controlsOpen}">
+        Settings <span class="control-panel__chevron">${state.controlsOpen ? '▴' : '▾'}</span>
+      </button>
+      ${state.controlsOpen ? `
+      <div class="control-panel__body">
+        <div class="control-row">
+          <span class="control-label">Sound</span>
+          <div class="segment-toggle" role="group" aria-label="Sound duration">
+            <button class="segment-btn${state.soundMode === 'short' ? ' segment-btn--active' : ''}" data-sound-mode="short">Short</button>
+            <button class="segment-btn${state.soundMode === 'long'  ? ' segment-btn--active' : ''}" data-sound-mode="long">Long</button>
           </div>
         </div>
-        ` : ''}
       </div>
-    </div>
-  `;
+      ` : ''}
+    </div>`;
+}
 
-  bindEvents();
+function renderDetectView() {
+  const statusText = !state.midiInitialized
+    ? 'Initialising MIDI…'
+    : state.midiSupported
+      ? getMIDIInputCount() === 0 ? 'MIDI ready — no devices connected' : `MIDI ready · ${getMIDIInputCount()} device${getMIDIInputCount() === 1 ? '' : 's'}`
+      : `No MIDI: ${state.midiError}`;
+
+  return `
+    <section class="detect-view">
+      ${renderKeySelector()}
+
+      <div class="detect-chord-display">
+        <div class="detect-chord-name" id="detect-chord-name">—</div>
+        <div class="detect-chord-notes" id="detect-chord-notes"></div>
+        <div class="detect-diatonic" id="detect-diatonic"></div>
+      </div>
+
+      <div class="detect-controls">
+        <div class="segment-toggle" role="group" aria-label="Echo">
+          <button class="segment-btn${!state.echoEnabled ? ' segment-btn--active' : ''}" data-echo="off">Echo off</button>
+          <button class="segment-btn${ state.echoEnabled ? ' segment-btn--active' : ''}" data-echo="on">Echo on</button>
+        </div>
+        <div class="detect-status">${statusText}</div>
+      </div>
+
+      ${!state.midiSupported && state.midiInitialized ? `
+      <div id="detect-keyboard-container" class="detect-keyboard-wrap"></div>
+      ` : ''}
+    </section>`;
 }
 
 function renderVoicingLabel() {
@@ -92,23 +209,59 @@ function renderVoicingLabel() {
     return `<span class="voicing-placeholder">Tap a chord to play</span>`;
   }
   const { notes, inversion } = state.lastVoicing;
-  const bass = midiToName(notes[0]);
+  const bass  = midiToName(notes[0]);
   const chord = state.chords[state.activeIndex];
   return `<span class="voicing-info">${chord.name} / ${bass} <em>(${inversionLabel(inversion)})</em></span>`;
 }
 
-// ── Keyboard mapping ──────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="app-wrapper">
+      <header class="app-header">
+        <h1 class="app-title">ChordMaster</h1>
+        ${renderModeTabs()}
+      </header>
+      ${state.appMode === 'play' ? renderPlayView() : renderDetectView()}
+    </div>
+  `;
+  bindEvents();
+  afterRender();
+}
 
-// Each row maps to [degree, inversion] for keys left-to-right (I–VII)
+function afterRender() {
+  if (state.appMode === 'detect') {
+    if (!state.midiSupported && state.midiInitialized) {
+      const kbContainer = document.getElementById('detect-keyboard-container');
+      if (kbContainer) initKeyboard(kbContainer, handleNotesChange);
+    }
+    updateDetectDisplay();
+  }
+}
+
+// ── Keyboard mapping (play mode) ──────────────────────────────────────────────
+
 const KEY_MAP = Object.fromEntries([
-  ...'zxcvbnm'.split('').map((k, i) => [k, [i, 0]]), // root position
-  ...'asdfghj'.split('').map((k, i) => [k, [i, 1]]), // 1st inversion
-  ...'qwertyu'.split('').map((k, i) => [k, [i, 2]]), // 2nd inversion
+  ...'zxcvbnm'.split('').map((k, i) => [k, [i, 0]]),
+  ...'asdfghj'.split('').map((k, i) => [k, [i, 1]]),
+  ...'qwertyu'.split('').map((k, i) => [k, [i, 2]]),
 ]);
 
 // ── Event binding ─────────────────────────────────────────────────────────────
 
 function bindEvents() {
+  // Mode tabs
+  document.querySelectorAll('[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newMode = btn.dataset.mode;
+      if (newMode === state.appMode) return;
+      state.appMode = newMode;
+      if (newMode === 'detect') ensureMIDI();
+      render();
+    });
+  });
+
+  // Key selector is present in both modes
   document.getElementById('root-select').addEventListener('change', (e) => {
     state.root = e.target.value;
     resetKey();
@@ -119,38 +272,54 @@ function bindEvents() {
     resetKey();
   });
 
-  document.querySelectorAll('.chord-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const index = parseInt(btn.dataset.index, 10);
-      handleChordTap(index);
+  if (state.appMode === 'play') {
+
+    document.querySelectorAll('.chord-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleChordTap(parseInt(btn.dataset.index, 10)));
     });
-  });
 
-  document.getElementById('controls-toggle').addEventListener('click', () => {
-    state.controlsOpen = !state.controlsOpen;
-    render();
-  });
-
-  document.querySelectorAll('[data-sound-mode]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.soundMode = btn.dataset.soundMode;
-      setSoundMode(state.soundMode);
+    document.getElementById('controls-toggle').addEventListener('click', () => {
+      state.controlsOpen = !state.controlsOpen;
       render();
     });
-  });
+
+    document.querySelectorAll('[data-sound-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.soundMode = btn.dataset.soundMode;
+        setSoundMode(state.soundMode);
+        render();
+      });
+    });
+  }
+
+  if (state.appMode === 'detect') {
+    document.querySelectorAll('[data-echo]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.echoEnabled = btn.dataset.echo === 'on';
+        if (!state.echoEnabled) {
+          releaseAllNotes();
+          echoHeld.clear();
+        }
+        render();
+      });
+    });
+  }
 }
 
+// ── Play mode actions ─────────────────────────────────────────────────────────
+
 async function handleKeyDown(e) {
+  if (state.appMode !== 'play') return;
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
   const mapping = KEY_MAP[e.key];
   if (!mapping) return;
   e.preventDefault();
   const [degree, inversion] = mapping;
-  const chord = state.chords[degree];
+  const chord   = state.chords[degree];
   const voicing = chooseForcedInversion(chord, inversion);
 
   state.activeIndex = degree;
-  state.prevNotes = voicing.notes;
+  state.prevNotes   = voicing.notes;
   state.lastVoicing = voicing;
   render();
 
@@ -162,25 +331,22 @@ async function handleKeyDown(e) {
 }
 
 function resetKey() {
-  state.prevNotes = null;
+  state.prevNotes   = null;
   state.activeIndex = null;
   state.lastVoicing = null;
-  state.chords = buildDiatonicChords(state.root, state.mode);
+  state.chords      = buildDiatonicChords(state.root, state.mode);
   render();
 }
 
 async function handleChordTap(index) {
-  const chord = state.chords[index];
+  const chord   = state.chords[index];
   const voicing = chooseBestVoicing(chord, state.prevNotes, index);
 
   state.activeIndex = index;
-  state.prevNotes = voicing.notes;
+  state.prevNotes   = voicing.notes;
   state.lastVoicing = voicing;
-
-  // Update UI immediately (re-render is cheap)
   render();
 
-  // Play audio
   try {
     await playChord(voicing.notes);
   } catch (err) {

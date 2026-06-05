@@ -27,6 +27,22 @@ function getSynth() {
   return synth;
 }
 
+/** Attack a single note without releasing others — for echo in detect mode. */
+export async function echoNoteOn(midiNote) {
+  await Tone.start();
+  getSynth().triggerAttack(Tone.Frequency(midiNote, 'midi').toNote(), Tone.now());
+}
+
+/** Release a single note — for echo in detect mode. */
+export function echoNoteOff(midiNote) {
+  synth?.triggerRelease(Tone.Frequency(midiNote, 'midi').toNote(), Tone.now());
+}
+
+/** Release all notes currently held by the synth. */
+export function releaseAllNotes() {
+  synth?.releaseAll();
+}
+
 /**
  * Play an array of MIDI note numbers simultaneously.
  * Ensures the AudioContext is running (required after a user gesture).

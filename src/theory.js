@@ -11,7 +11,7 @@ const FLAT_NAMES  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb',
  * Sharp major keys: C G D A E B F#  (everything except F and flat-named roots)
  * Sharp minor keys: A E B F# C# G# D#
  */
-function keyUsesSharps(rootName, mode) {
+export function keyUsesSharps(rootName, mode) {
   if (rootName.includes('#')) return true;
   if (rootName.includes('b')) return false;
   // Natural-letter roots
