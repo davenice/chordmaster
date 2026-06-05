@@ -434,6 +434,19 @@ select:focus {
   background: var(--accent-dim);
 }
 
+/* ── Build info ─────────────────────────────────────────────────────────────── */
+.build-info {
+  position: fixed;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  opacity: 0.45;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  font-family: var(--font);
+}
+
 /* ── Segment toggle ─────────────────────────────────────────────────────────── */
 .segment-toggle {
   display: flex;

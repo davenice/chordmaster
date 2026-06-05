@@ -380,6 +380,11 @@ function handleShiftUp(e) {
 export function init() {
   state.chords = buildDiatonicChords(state.root, state.mode);
   render();
+  const buildInfo = document.createElement('div');
+  buildInfo.className = 'build-info';
+  const date = new Date(__BUILD_DATE__).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+  buildInfo.textContent = `${__COMMIT_ID__} · ${date}`;
+  document.body.appendChild(buildInfo);
   document.addEventListener('keydown', handleKeyDown);
   document.addEventListener('keydown', handleShiftDown);
   document.addEventListener('keyup', handleShiftUp);
