@@ -16,7 +16,6 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
-    "tone": "^15.1.22",
-    "vite-plugin-pwa": "^1.2.0"
+    "tone": "^15.1.22"
   }
 }
