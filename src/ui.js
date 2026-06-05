@@ -208,9 +208,8 @@ function renderVoicingLabel() {
   if (state.activeIndex === null || !state.lastVoicing) {
     return `<span class="voicing-placeholder">Tap a chord to play</span>`;
   }
-  const { notes, inversion } = state.lastVoicing;
+  const { notes, inversion, chord = state.chords[state.activeIndex] } = state.lastVoicing;
   const bass  = midiToName(notes[0]);
-  const chord = state.chords[state.activeIndex];
   return `<span class="voicing-info">${chord.name} / ${bass} <em>(${inversionLabel(inversion)})</em></span>`;
 }
 
@@ -308,19 +307,26 @@ function bindEvents() {
 
 // ── Play mode actions ─────────────────────────────────────────────────────────
 
+function invertedChord(chord) {
+  const flipped = chord.quality === 'maj' ? 'min' : chord.quality === 'min' ? 'maj' : chord.quality;
+  if (flipped === chord.quality) return chord;
+  const suffix = flipped === 'maj' ? '' : 'm';
+  return { ...chord, quality: flipped, name: chord.name.replace(/m?$/, suffix) };
+}
+
 async function handleKeyDown(e) {
   if (state.appMode !== 'play') return;
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
-  const mapping = KEY_MAP[e.key];
+  const mapping = KEY_MAP[e.key.toLowerCase()];
   if (!mapping) return;
   e.preventDefault();
   const [degree, inversion] = mapping;
-  const chord   = state.chords[degree];
+  const chord   = e.shiftKey ? invertedChord(state.chords[degree]) : state.chords[degree];
   const voicing = chooseForcedInversion(chord, inversion);
 
   state.activeIndex = degree;
   state.prevNotes   = voicing.notes;
-  state.lastVoicing = voicing;
+  state.lastVoicing = { ...voicing, chord };
   render();
 
   try {
